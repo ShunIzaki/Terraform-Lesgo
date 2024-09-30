@@ -1,0 +1,97 @@
+import os
+import time
+
+CMD_SIZE = 100
+IR_DATA_FILE = "ir_data.txt"
+
+class IRSensorModuleHandler:
+    def __init__(self):
+        self.sys_Param_g = {"IR_control": 1}
+        self.tx_table_g = {"tx_table_db": [{"id": 0}, {"id": 1}, {"id": 2}], "totalTx": 3}
+        self.rx_table_g = {"rx_table_db": [{"source_id": 0}, {"source_id": 1}, {"source_id": 2}]}
+        self.action = None
+        self.ir_key = ""
+        self.rx_data_received = 0
+        self.tx_data_received = 0
+        self.edid_data_received = 0
+
+    def find_data_from_rx_table(self, rx_data):
+        for i, item in enumerate(self.rx_table_g["rx_table_db"]):
+            if item["source_id"] == rx_data:
+                return i
+        return 0
+
+    def find_data_from_tx_table(self, tx_data):
+        for i, item in enumerate(self.tx_table_g["tx_table_db"]):
+            if item["id"] == tx_data:
+                return i
+        return 0
+
+    def get_id_from_key(self, key):
+        return int(key[1:])
+
+    def start_timer(self, timer_id, callback, mode, data):
+        pass
+
+    def time_out_tx(self):
+        pass
+
+    def time_out_edid(self):
+        pass
+
+    def init_ir_sensor_module_handler(self):
+        while True:
+            if self.sys_Param_g["IR_control"] == 1:
+                try:
+                    with open(IR_DATA_FILE, "a+") as fp:
+                        if self.ir_key:
+                            if self.ir_key.startswith("O"):
+                                self.action = "OUTPUT"
+                            elif self.ir_key.startswith("E"):
+                                self.action = "EDID"
+                            file_descriptor = fp.fileno()
+
+                            if self.action == "INPUT":
+                                min_id = self.tx_table_g["tx_table_db"][0]["id"]
+                                max_id = self.tx_table_g["tx_table_db"][-1]["id"]
+                                if self.ir_key.startswith("I9"):
+                                    idx_rx = self.find_data_from_rx_table(self.rx_data_received)
+                                    if self.rx_data_received != 0:
+                                        self.tx_data_received = self.rx_table_g["rx_table_db"][idx_rx]["source_id"]
+                                    else:
+                                        self.tx_data_received = self.rx_table_g["rx_table_db"][0]["source_id"]
+                                    idx_tx = self.find_data_from_tx_table(self.tx_data_received)
+                                    if self.tx_data_received > min_id:
+                                        for i in range(idx_tx - 1, 0, -1):
+                                            if self.tx_table_g["tx_table_db"][i]["id"]:
+                                                break
+                                        self.tx_data_received = self.tx_table_g["tx_table_db"][i]["id"]
+                                    else:
+                                        self.tx_data_received = max_id
+                                elif self.ir_key.startswith("I10"):
+                                    if self.rx_data_received != 0:
+                                        self.tx_data_received = self.rx_table_g["rx_table_db"][idx_rx]["source_id"]
+                                    else:
+                                        self.tx_data_received = self.rx_table_g["rx_table_db"][0]["source_id"]
+                                    idx_tx = self.find_data_from_tx_table(self.tx_data_received)
+                                    if self.tx_data_received < max_id:
+                                        for i in range(idx_tx + 1, len(self.tx_table_g["tx_table_db"])):
+                                            if self.tx_table_g["tx_table_db"][i]["id"]:
+                                                break
+                                        self.tx_data_received = self.tx_table_g["tx_table_db"][i]["id"]
+                                    else:
+                                        self.tx_data_received = min_id
+                                else:
+                                    self.tx_data_received = self.get_id_from_key(self.ir_key)
+                                self.start_timer(6, self.time_out_tx, "TIMER_SINGLE_SHOT", None)
+                            elif self.action == "EDID":
+                                self.edid_data_received = self.get_id_from_key(self.ir_key)
+                                self.start_timer(6, self.time_out_edid, "TIMER_SINGLE_SHOT", None)
+                            self.ir_key = ""
+                except IOError:
+                    print("Failed to open file")
+            time.sleep(1)
+        return "SUCCESS"
+
+handler = IRSensorModuleHandler()
+handler.init_ir_sensor_module_handler()
