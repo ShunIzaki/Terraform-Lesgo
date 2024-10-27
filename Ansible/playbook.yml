@@ -1,0 +1,25 @@
+---
+- name: Demo Ansible
+hosts: dbservers
+become: true
+
+tasks:
+- name: Install Apache
+yum:
+name: httpd
+state: latest
+
+- name: Start Apache
+service:
+name: httpd
+state: started
+enabled: true
+
+- name: Add the user 'bob' with a specific uid 
+ansible.builtin.user:
+name: bob
+state: present
+uid: 1040
+/*
+
+*/
